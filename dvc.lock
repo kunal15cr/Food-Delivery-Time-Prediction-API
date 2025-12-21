@@ -25,8 +25,8 @@ stages:
       size: 4508527
     - path: params.yaml
       hash: md5
-      md5: fc119f5d487a6f076ce3b5be4be9de90
-      size: 55
+      md5: 64dfd1c46c4de6b556716ddaad06928a
+      size: 551
     - path: src/data/data_preparation.py
       hash: md5
       md5: b97a07258b547e03768bab50f2f670ea
@@ -72,3 +72,72 @@ stages:
       hash: md5
       md5: d7d8a9720f5d4cd5e8b9fddf01dfcce0
       size: 8189
+  train:
+    cmd: python src/models/train.py
+    deps:
+    - path: data/processed/train_trans.csv
+      hash: md5
+      md5: 0d2f47751596e1c0f6bffbf7bb582a07
+      size: 4329420
+    - path: src/models/train.py
+      hash: md5
+      md5: b7b69ed8e77672b21bfffc93336aa161
+      size: 4910
+    params:
+      params.yaml:
+        Train.LightGBM:
+          n_estimators: 154
+          max_depth: 27
+          learning_rate: 0.22234435854395157
+          subsample: 0.7592213724048168
+          min_child_weight: 20
+          min_split_gain: 0.004604680609280751
+          reg_lambda: 97.81002379097947
+          n_jobs: -1
+        Train.Random_Forest:
+          n_estimators: 479
+          criterion: squared_error
+          max_depth: 17
+          max_features: 1
+          min_samples_split: 9
+          min_samples_leaf: 2
+          max_samples: 0.6603673526197066
+          verbose: 1
+          n_jobs: -1
+    outs:
+    - path: models/model.joblib
+      hash: md5
+      md5: a47d3fc400219fececccedc617e7a94b
+      size: 157361976
+    - path: models/power_transformer.joblib
+      hash: md5
+      md5: 043fb612cd69e7107dc7310ee4970ac9
+      size: 837
+    - path: models/stacking_regressor.joblib
+      hash: md5
+      md5: 4bc1644f94e3bb9733fa146d2782bfef
+      size: 157350442
+  evaluation:
+    cmd: python src/models/evaluation.py
+    deps:
+    - path: data/processed/test_trans.csv
+      hash: md5
+      md5: 2519c7291782edca74e688cc944df5b9
+      size: 1089313
+    - path: data/processed/train_trans.csv
+      hash: md5
+      md5: 0d2f47751596e1c0f6bffbf7bb582a07
+      size: 4329420
+    - path: models/model.joblib
+      hash: md5
+      md5: a47d3fc400219fececccedc617e7a94b
+      size: 157361976
+    - path: src/models/evaluation.py
+      hash: md5
+      md5: 1aa4a3cad1f80c51e5f23ff4567efb77
+      size: 6013
+    outs:
+    - path: run_information.json
+      hash: md5
+      md5: 8371bbb9a89e308b77596fc3a252b99f
+      size: 220
