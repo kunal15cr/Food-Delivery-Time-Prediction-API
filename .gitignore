@@ -78,10 +78,7 @@ target/
 # exclude data from source control by default
 /data/
 
-# allow tracking DVC metafiles in data folder
-!data/**/*.dvc
-!data/*.dvc
-!data/raw/
+
 
 # Mac OS-specific storage files
 .DS_Store
