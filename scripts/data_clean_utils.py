@@ -1,150 +1,232 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
-# --------------------------------------------------
-# Column standardization
-# --------------------------------------------------
-def change_column_names(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Standardize column names and make them model-friendly
-    """
+columns_to_drop =  ['rider_id',
+                    'restaurant_latitude',
+                    'restaurant_longitude',
+                    'delivery_latitude',
+                    'delivery_longitude',
+                    'order_date',
+                    "order_time_hour",
+                    "order_day",
+                    "city_name",
+                    "order_day_of_week",
+                    "order_month"]
+
+
+def change_column_names(data: pd.DataFrame):
     return (
-        data
-        .rename(columns=str.lower)
-        .rename(columns={
-            "delivery_person_id": "rider_id",
+        data.rename(str.lower,axis=1)
+        .rename({
+            "delivery_person_id" : "rider_id",
             "delivery_person_age": "age",
             "delivery_person_ratings": "ratings",
             "delivery_location_latitude": "delivery_latitude",
             "delivery_location_longitude": "delivery_longitude",
-            "time_taken(min)": "time_taken",
-        })
+            "time_orderd": "order_time",
+            "time_order_picked": "order_picked_time",
+            "weatherconditions": "weather",
+            "road_traffic_density": "traffic",
+            "city": "city_type",
+            "time_taken(min)": "time_taken"},
+            axis=1)
     )
 
 
-# --------------------------------------------------
-# Core data cleaning
-# --------------------------------------------------
+import numpy as np
+import pandas as pd
+
 def data_cleaning(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Clean invalid rows, cast datatypes, and engineer base features
-    """
+    data = data.copy()
+
+    # ---- Drop invalid rows safely ----
+    data["age"] = pd.to_numeric(data["age"], errors="coerce")
+    data["ratings"] = pd.to_numeric(data["ratings"], errors="coerce")
+
+    data = data[
+        (data["age"] >= 18) &
+        (data["ratings"] <= 5)
+    ]
+
     return (
         data
         .drop(columns=["id"], errors="ignore")
         .replace(["NaN", "NaN "], np.nan)
+
         .assign(
-            age=lambda x: pd.to_numeric(x["age"], errors="coerce"),
-            ratings=lambda x: pd.to_numeric(x["ratings"], errors="coerce"),
-            time_taken=lambda x: pd.to_numeric(x["time_taken"], errors="coerce"),
-        )
-        # Remove minors and invalid ratings
-        .loc[lambda x: (x["age"] >= 18) & (x["ratings"] != 6)]
-        .assign(
+            # city column from rider_id
             city_name=lambda x: x["rider_id"].str.split("RES").str[0],
+
+            # numeric conversions
+            age=lambda x: x["age"].astype(float),
+            ratings=lambda x: x["ratings"].astype(float),
+
+            # absolute latitude/longitude
             restaurant_latitude=lambda x: x["restaurant_latitude"].abs(),
             restaurant_longitude=lambda x: x["restaurant_longitude"].abs(),
             delivery_latitude=lambda x: x["delivery_latitude"].abs(),
             delivery_longitude=lambda x: x["delivery_longitude"].abs(),
+
+            # date features
+            order_date=lambda x: pd.to_datetime(x["order_date"], dayfirst=True),
+            order_day=lambda x: x["order_date"].dt.day,
+            order_month=lambda x: x["order_date"].dt.month,
+            order_day_of_week=lambda x: x["order_date"].dt.day_name().str.lower(),
+            is_weekend=lambda x: x["order_date"]
+                .dt.day_name()
+                .isin(["Saturday", "Sunday"])
+                .astype(int),
+
+            # time features
+            order_time=lambda x: pd.to_datetime(x["order_time"], format="mixed"),
+            order_picked_time=lambda x: pd.to_datetime(x["order_picked_time"], format="mixed"),
+
+            pickup_time_minutes=lambda x: (
+                (x["order_picked_time"] - x["order_time"])
+                .dt.total_seconds() / 60
+            ),
+
+            order_time_hour=lambda x: x["order_time"].dt.hour,
+            order_time_of_day=lambda x: x["order_time_hour"].pipe(time_of_day),
+
+            # categorical cleanup
+            weather=lambda x: (
+                x["weather"]
+                .str.replace("conditions ", "", regex=False)
+                .str.lower()
+                .replace("nan", np.nan)
+            ),
+            traffic=lambda x: x["traffic"].str.strip().str.lower(),
+            type_of_order=lambda x: x["type_of_order"].str.strip().str.lower(),
+            type_of_vehicle=lambda x: x["type_of_vehicle"].str.strip().str.lower(),
+            festival=lambda x: x["festival"].str.strip().str.lower(),
+            city_type=lambda x: x["city_type"].str.strip().str.lower(),
+
+            # multiple deliveries
+            multiple_deliveries=lambda x: pd.to_numeric(
+                x["multiple_deliveries"], errors="coerce"
+            ),
+
+            # target column
+            time_taken=lambda x: (
+                x["time_taken"]
+                .str.replace("(min) ", "", regex=False)
+                .astype(int)
+            )
         )
+        .drop(columns=["order_time", "order_picked_time"])
     )
 
 
-# --------------------------------------------------
-# Latitude / Longitude cleanup
-# --------------------------------------------------
-def clean_lat_long(data: pd.DataFrame, threshold: float = 1.0) -> pd.DataFrame:
-    """
-    Remove invalid latitude/longitude values
-    """
-    location_columns = [
-        "restaurant_latitude",
-        "restaurant_longitude",
-        "delivery_latitude",
-        "delivery_longitude",
-    ]
+    
+    
+    
+def clean_lat_long(data: pd.DataFrame, threshold=1):
+    location_columns = ['restaurant_latitude',
+                        'restaurant_longitude',
+                        'delivery_latitude',
+                        'delivery_longitude']
 
-    return data.assign(**{
-        col: lambda x, c=col: np.where(x[c] < threshold, np.nan, x[c])
-        for col in location_columns
-    })
-
-
-# --------------------------------------------------
-# Distance calculation
-# --------------------------------------------------
-def calculate_haversine_distance(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate delivery distance using Haversine formula (km)
-    """
-    lat1, lon1, lat2, lon2 = map(
-        np.radians,
-        [
-            data["restaurant_latitude"],
-            data["restaurant_longitude"],
-            data["delivery_latitude"],
-            data["delivery_longitude"],
-        ]
-    )
-
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-
-    a = (
-        np.sin(dlat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-    )
-
-    distance = 6371 * 2 * np.arcsin(np.sqrt(a))
-
-    return data.assign(distance=distance)
-
-
-# --------------------------------------------------
-# Export (PIPE SAFE)
-# --------------------------------------------------
-def export_data_cleaning_pipeline(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Export cleaned data to CSV and return DataFrame
-    """
-    data.to_csv("Food_Delivery_cleaned_data.csv", index=False)
-    return data
-
-
-def create_distance_types(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Create categorical distance types based on distance
-    """
-    return data.assign(
-        distance_type=lambda x: pd.cut(
-            x["distance"],
-            bins=[0, 5, 10, 15, 25],
-            labels=["short", "medium", "long", "very long"]
-        )
-    )
-
-
-# --------------------------------------------------
-# Full pipeline
-# --------------------------------------------------
-def full_data_cleaning_pipeline(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    End-to-end data cleaning pipeline
-    """
     return (
+        data
+        .assign(**{
+            col: (
+                np.where(data[col] < threshold, np.nan, data[col].values)
+            )
+            for col in location_columns
+        })
+    )
+    
+    
+# extract day, day name, month and year
+def extract_datetime_features(ser):
+    date_col = pd.to_datetime(ser,dayfirst=True)
+
+    return (
+        pd.DataFrame(
+            {
+                "day": date_col.dt.day,
+                "month": date_col.dt.month,
+                "year": date_col.dt.year,
+                "day_of_week": date_col.dt.day_name(),
+                "is_weekend": date_col.dt.day_name().isin(["Saturday","Sunday"]).astype(int)
+            }
+        ))
+    
+    
+def time_of_day(ser):
+
+    return(
+        pd.cut(ser,bins=[0,6,12,17,20,24],right=True,
+               labels=["after_midnight","morning","afternoon","evening","night"])
+    )
+
+
+def drop_columns(data: pd.DataFrame, columns: list) -> pd.DataFrame:
+    df = data.drop(columns=columns)
+    return df
+
+
+def calculate_haversine_distance(df):
+    location_columns = ['restaurant_latitude',
+                        'restaurant_longitude',
+                        'delivery_latitude',
+                        'delivery_longitude']
+    
+    lat1 = df[location_columns[0]]
+    lon1 = df[location_columns[1]]
+    lat2 = df[location_columns[2]]
+    lon2 = df[location_columns[3]]
+
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+
+    a = np.sin(
+        dlat / 2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0)**2
+
+    c = 2 * np.arcsin(np.sqrt(a))
+    distance = 6371 * c
+
+    return (
+        df.assign(
+            distance = distance)
+    )
+
+def create_distance_type(data: pd.DataFrame):
+    return(
+        data
+        .assign(
+                distance_type = pd.cut(data["distance"],bins=[0,5,10,15,25],
+                                        right=False,labels=["short","medium","long","very_long"])
+    ))
+
+
+def perform_data_cleaning(data: pd.DataFrame):
+
+    cleaned_data = (
         data
         .pipe(change_column_names)
         .pipe(data_cleaning)
         .pipe(clean_lat_long)
         .pipe(calculate_haversine_distance)
-        .pipe(create_distance_types)
-        .pipe(export_data_cleaning_pipeline)
-        
+        .pipe(create_distance_type)
+        .pipe(drop_columns,columns=columns_to_drop)
     )
+    
+    return cleaned_data
+    
+    
 
 if __name__ == "__main__":
-    # Example usage
-    raw_data = pd.read_excel("Food Delivery Time Prediction Case Study.xlsx", sheet_name="Sheet1")
-    cleaned_data = full_data_cleaning_pipeline(raw_data)
-    cleaned_data.to_csv("Food_Delivery_cleaned_data.csv", index=False)
+    # data path for data
+    DATA_PATH = "swiggy.csv"
+    
+    # read the data from path
+    df = pd.read_csv(DATA_PATH)
+    print('swiggy data loaded successfuly')
+    
+    df = perform_data_cleaning(df)
+    df.to_csv("swiggy_cleaned.csv",index=False)
