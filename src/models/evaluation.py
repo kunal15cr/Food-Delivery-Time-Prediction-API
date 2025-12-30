@@ -11,10 +11,15 @@ import json
 
 # initialize dagshub
 import dagshub
-dagshub.init(repo_owner='kunal15cr', repo_name='Food-Delivery-Time-Prediction-API', mlflow=True)
+dagshub.init(
+    repo_owner="kunal15cr",
+    repo_name="Food-Delivery-Time-Prediction-API",
+    mlflow=True
+)
 
-# set the mlflow tracking server
-mlflow.set_tracking_uri("https://dagshub.com/kunal15cr/Food-Delivery-Time-Prediction-API.mlflow")
+mlflow.set_tracking_uri(
+    "https://dagshub.com/kunal15cr/Food-Delivery-Time-Prediction-API.mlflow"
+)
 
 # set mlflow experment name
 mlflow.set_experiment("DVC Pipeline")
@@ -153,7 +158,7 @@ if __name__ == "__main__":
                                     model_output=model.predict(X_train.sample(20,random_state=42)))
         
         # log the final model
-        mlflow.sklearn.log_model(model,"delivery_time_pred_model",signature=model_signature)
+        mlflow.sklearn.log_model(model,name="delivery_time_pred_model",signature=model_signature)
 
         # log stacking regressor
         mlflow.log_artifact(root_path / "models" / "stacking_regressor.joblib")
@@ -180,4 +185,6 @@ if __name__ == "__main__":
                     artifact_path=artifact_uri,
                     model_name=model_name)
     logger.info("Model Information saved")
+    
+    
     
