@@ -29,14 +29,20 @@ jobs:
           aws-region: ap-south-1
 
       - name: DVC Pull
-        run: |
-          dvc pull
-
-      - name: Test Model Performance
         env:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          pytest -v
+          dvc pull
+
+      - name: Verify Data Exists
+        run: |
+          test -f data/raw/swiggy.csv
+
+      - name: Run Tests
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          pytest tests/test_model_perf.py
 
       - name: Promote Model
         if: success()
