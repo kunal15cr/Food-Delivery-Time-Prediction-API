@@ -5,6 +5,10 @@ __pycache__/
 # C extensions
 *.so
 
+data/
+# BUT allow DVC metadata files
+!data/**/*.dvc
+
 models/*.joblib
 models/*.pkl
 models/*.bin
