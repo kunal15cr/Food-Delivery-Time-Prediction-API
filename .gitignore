@@ -12,6 +12,10 @@ models/*.bin
 *.joblib
 model/*.joblib
 models/*.joblib
+*.joblib
+model/
+models/
+
 # Distribution / packaging
 .Python
 env/
