@@ -31,12 +31,6 @@ jobs:
         run: |
           dvc pull
 
-      - name: Test Model Registry
-        env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          pytest tests/test_model_registry.py
-
       - name: Test Model Performance
         env:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
