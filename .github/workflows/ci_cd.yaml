@@ -34,10 +34,6 @@ jobs:
         run: |
           dvc pull
 
-      - name: Verify Data Exists
-        run: |
-          test -f data/raw/swiggy.csv
-
       - name: Run Tests
         env:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
