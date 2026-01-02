@@ -8,7 +8,10 @@ __pycache__/
 models/*.joblib
 models/*.pkl
 models/*.bin
-
+# ML models
+*.joblib
+model/*.joblib
+models/*.joblib
 # Distribution / packaging
 .Python
 env/
