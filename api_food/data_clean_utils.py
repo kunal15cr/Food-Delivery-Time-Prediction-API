@@ -108,12 +108,11 @@ def data_cleaning(data: pd.DataFrame) -> pd.DataFrame:
                 x["multiple_deliveries"], errors="coerce"
             ),
 
-            # target column (optional for prediction — leave as NaN when missing)
+            # target column
             time_taken=lambda x: (
                 x["time_taken"]
                 .str.replace("(min) ", "", regex=False)
                 .astype(int)
-                if "time_taken" in x.columns else pd.Series(np.nan, index=x.index)
             )
         )
         .drop(columns=["order_time", "order_picked_time"])

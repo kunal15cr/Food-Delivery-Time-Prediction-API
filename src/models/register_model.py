@@ -39,20 +39,17 @@ def load_run_information(file_path: Path) -> dict:
 
 # -------------------- MAIN --------------------
 if __name__ == "__main__":
-    # project root
     root_path = Path(__file__).parent.parent.parent
-
-    # run info file
     run_info_path = root_path / "run_information.json"
 
     run_info = load_run_information(run_info_path)
 
     run_id = run_info["run_id"]
-    artifact_path = run_info["artifact_path"]
+    artifact_path = run_info["artifact_path"]   # ✅ IMPORTANT
     model_name = run_info["model_name"]
 
-    # 🔥 THIS IS THE ONLY CORRECT MODEL URI FORMAT
-    model_uri = f"https://dagshub.com/kunal15cr/Food-Delivery-Time-Prediction-API.mlflow/#/experiments/6/runs/{run_id}/artifacts/{artifact_path}"
+    # ✅ THE ONLY CORRECT MODEL URI
+    model_uri = f"runs:/{run_id}/{artifact_path}"
 
     logger.info(f"Registering model from URI: {model_uri}")
     logger.info(f"Model registry name: {model_name}")
