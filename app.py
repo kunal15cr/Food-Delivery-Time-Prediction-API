@@ -89,25 +89,26 @@ stage = "Production"
 # latest_model_ver = client.get_latest_versions(name=model_name,stages=[stage])
 # print(f"Latest model in production is version {latest_model_ver[0].version}")
 
-# load model path
-model_path = f"models:/{model_name}/{stage}"
+def load_model_from_dagshub(model_name: str, model_version: str):
+    model_name=model_name
+    model_version= model_version
 
-# load the latest model from model registry
-try:
-    model = mlflow.sklearn.load_model(model_path)
-except mlflow.exceptions.MlflowException:
-    # Fallback to local model if registry model/version not found
-    print(f"Model '{model_name}' in stage '{stage}' not found in registry; loading local model.joblib")
-    model = joblib.load("models/model.joblib")
+    model_uri=f"models:/{model_name}/{model_version}"
+
+    model=mlflow.sklearn.load_model(model_uri)
+    model
+    return model
 
 # load the preprocessor
 preprocessor_path = "models/preprocessor.joblib"
 preprocessor = load_transformer(preprocessor_path)
 
+pridict_model = load_model_from_dagshub("delivery_time_pred_model", "latest")
+
 # build the model pipeline
 model_pipe = Pipeline(steps=[
     ('preprocess',preprocessor),
-    ("regressor",model)
+    ("regressor",pridict_model)
 ])
 
 # create the app
