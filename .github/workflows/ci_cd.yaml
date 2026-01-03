@@ -1,71 +1,98 @@
 name: CI-CD
 
-on: push
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-  CI-CD:
+  ci-cd:
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: ap-south-1
+      ECR_REPOSITORY: food-delivery-time-prediction
+
     steps:
-      - name: Code Checkout
+      # -----------------------------
+      # 1. Checkout code
+      # -----------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Setup Python
+      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Install Packages
+      # -----------------------------
+      # 3. Install dependencies
+      # -----------------------------
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements_dev.txt
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-
-      - name: DVC Pull
-        env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          dvc pull
-
-      - name: Run Tests
-        env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          pytest tests/test_model_perf.py
-
-      - name: Promote Model
-        if: success()
-        env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          python scripts/promote_model_to_prod.py
-
+      # -----------------------------
+      # 4. Configure AWS credentials
+      # -----------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
-     
+
+      # -----------------------------
+      # 5. Pull DVC data & models
+      # -----------------------------
+      - name: DVC Pull
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc pull
+
+      # -----------------------------
+      # 6. Run tests
+      # -----------------------------
+      - name: Run tests
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          pytest tests/test_model_perf.py
+
+      # -----------------------------
+      # 7. Promote model to Production
+      # -----------------------------
+      - name: Promote model
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          python scripts/promote_model_to_prod.py
+
+      # -----------------------------
+      # 8. Login to Amazon ECR
+      # -----------------------------
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-  
-      - name: Build, tag, and push docker image to Amazon ECR
+      # -----------------------------
+      # 9. Build & Push Docker image
+      # -----------------------------
+      - name: Build and push Docker image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ secrets.ECR_REPOSITORY_URI }}
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-
-
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPOSITORY:latest
